@@ -114,6 +114,31 @@ async function moveLinks(ids, targetBoardId) {
   }
 }
 
+async function copyLinks(ids, targetBoardId) {
+  const now = Date.now();
+  const targetLinks = await db.links.where('boardId').equals(targetBoardId).toArray();
+  let maxOrder = targetLinks.length > 0 ? Math.max(...targetLinks.map(l => l.sortOrder || 0)) : -1;
+
+  for (const id of ids) {
+    const original = await db.links.get(id);
+    if (!original) continue;
+    maxOrder++;
+    const copy = {
+      id: generateId(),
+      boardId: targetBoardId,
+      url: original.url,
+      title: original.title,
+      domain: original.domain,
+      tag: original.tag,
+      thumbnailUrl: original.thumbnailUrl,
+      sortOrder: maxOrder,
+      createdAt: now,
+      updatedAt: now
+    };
+    await db.links.add(copy);
+  }
+}
+
 // === Summary Operations ===
 
 async function saveSummary(linkId, boardId, content) {

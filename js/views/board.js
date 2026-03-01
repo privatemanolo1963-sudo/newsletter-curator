@@ -261,6 +261,7 @@ function updateActionBar(boardId, boardName, links) {
     <span class="action-bar-count">${selectedIds.size}</span>
     <button class="btn btn-secondary" id="action-toggle-all">${allSelected ? 'Deseleziona' : 'Tutti'}</button>
     <button class="btn btn-secondary" id="action-move">Sposta</button>
+    <button class="btn btn-secondary" id="action-copy">Copia</button>
     <button class="btn btn-danger" id="action-delete">Elimina</button>
     <button class="btn btn-primary" id="action-export">Mail</button>
   `;
@@ -283,6 +284,11 @@ function updateActionBar(boardId, boardName, links) {
   // Move
   document.getElementById('action-move').addEventListener('click', () => {
     showMoveModal(boardId, links);
+  });
+
+  // Copy
+  document.getElementById('action-copy').addEventListener('click', () => {
+    showCopyModal(boardId, links);
   });
 
   // Delete
@@ -378,6 +384,100 @@ function showMoveToNewBoardModal(currentBoardId) {
     close();
     renderBoard({ id: currentBoardId });
     showToast('Link spostati in "' + name + '"');
+  };
+
+  document.getElementById('modal-cancel').addEventListener('click', close);
+  document.getElementById('modal-confirm').addEventListener('click', confirm);
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') confirm();
+    if (e.key === 'Escape') close();
+  });
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) close();
+  });
+}
+
+// === Copy Modal ===
+
+async function showCopyModal(currentBoardId, links) {
+  const boards = await getAllBoards();
+  const otherBoards = boards.filter(b => b.id !== currentBoardId);
+
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+
+  let boardListHtml = '';
+  for (const b of otherBoards) {
+    boardListHtml += `<button class="move-board-option" data-id="${b.id}">${escapeHtml(b.name)} <span class="move-board-count">${b.linkCount} link</span></button>`;
+  }
+
+  overlay.innerHTML = `
+    <div class="modal">
+      <h2>Copia ${selectedIds.size} link in...</h2>
+      <div class="move-board-list">
+        ${boardListHtml}
+        <button class="move-board-option move-board-new" id="copy-new-board">+ Nuova board</button>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" id="modal-cancel">Annulla</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+
+  const close = () => overlay.remove();
+
+  document.getElementById('modal-cancel').addEventListener('click', close);
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) close();
+  });
+
+  // Copy to existing board
+  overlay.querySelectorAll('.move-board-option[data-id]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      await copyLinks(Array.from(selectedIds), btn.dataset.id);
+      selectedIds.clear();
+      close();
+      renderBoard({ id: currentBoardId });
+      showToast('Link copiati');
+    });
+  });
+
+  // Copy to new board
+  document.getElementById('copy-new-board').addEventListener('click', () => {
+    close();
+    showCopyToNewBoardModal(currentBoardId);
+  });
+}
+
+function showCopyToNewBoardModal(currentBoardId) {
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.innerHTML = `
+    <div class="modal">
+      <h2>Nuova Board</h2>
+      <input class="modal-input" id="copy-new-board-name" type="text" placeholder="Nome della board..." autofocus>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" id="modal-cancel">Annulla</button>
+        <button class="btn btn-primary" id="modal-confirm">Crea e Copia</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+
+  const input = document.getElementById('copy-new-board-name');
+  input.focus();
+  const close = () => overlay.remove();
+
+  const confirm = async () => {
+    const name = input.value.trim();
+    if (!name) return;
+    const newBoard = await createBoard(name);
+    await copyLinks(Array.from(selectedIds), newBoard.id);
+    selectedIds.clear();
+    close();
+    renderBoard({ id: currentBoardId });
+    showToast('Link copiati in "' + name + '"');
   };
 
   document.getElementById('modal-cancel').addEventListener('click', close);
