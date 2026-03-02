@@ -60,9 +60,9 @@ async function deleteBoard(id) {
 
 async function addLink(boardId, url, title, domain) {
   const now = Date.now();
-  // Get max sortOrder in this board
+  // New links go to the top (lowest sortOrder)
   const links = await db.links.where('boardId').equals(boardId).toArray();
-  const maxOrder = links.length > 0 ? Math.max(...links.map(l => l.sortOrder || 0)) : -1;
+  const minOrder = links.length > 0 ? Math.min(...links.map(l => l.sortOrder || 0)) : 1;
 
   const link = {
     id: generateId(),
@@ -71,7 +71,7 @@ async function addLink(boardId, url, title, domain) {
     title: title || domain,
     domain,
     thumbnailUrl: null,
-    sortOrder: maxOrder + 1,
+    sortOrder: minOrder - 1,
     createdAt: now,
     updatedAt: now
   };

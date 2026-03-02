@@ -7,6 +7,22 @@ Router.register('#/board/:boardId/link/:linkId', renderArticle);
 Router.register('#/board/:id/summaries', renderSummaries);
 Router.register('#/settings', renderSettings);
 
+// One-time migration: reverse existing link order (newest first)
+(async function migrateLinksOrder() {
+  const DONE_KEY = 'curator_migrate_reverse_v1';
+  if (localStorage.getItem(DONE_KEY)) return;
+  const boards = await db.boards.toArray();
+  for (const board of boards) {
+    const links = await db.links.where('boardId').equals(board.id).toArray();
+    links.sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
+    // Reverse: last added (highest sortOrder) gets sortOrder 0
+    for (let i = 0; i < links.length; i++) {
+      await db.links.update(links[i].id, { sortOrder: links.length - 1 - i });
+    }
+  }
+  localStorage.setItem(DONE_KEY, '1');
+})();
+
 // Start router
 Router.init();
 
