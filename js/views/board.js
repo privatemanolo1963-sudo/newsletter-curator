@@ -24,6 +24,7 @@ async function renderBoard(params) {
       <div class="board-header">
         <button class="btn-back" id="btn-back" title="Indietro">&#8592;</button>
         <input class="board-title-input" id="board-title" value="${escapeHtml(board.name)}" spellcheck="false">
+        <button class="btn-header-action" id="btn-sort-tag" title="Ordina per tag">Tag</button>
         <button class="btn-header-action" id="btn-export-all" title="Esporta tutti">Mail</button>
         <button class="btn-header-action" id="btn-view-summaries" title="Riassunti">Sum</button>
       </div>
@@ -168,6 +169,27 @@ async function renderBoard(params) {
     });
   });
 
+  // Sort by tag button
+  const sortTagBtn = document.getElementById('btn-sort-tag');
+  if (sortTagBtn) {
+    sortTagBtn.addEventListener('click', async () => {
+      // Sort: tagged links grouped alphabetically by tag, untagged at bottom
+      const sorted = [...links].sort((a, b) => {
+        const tagA = (a.tag || '').toLowerCase();
+        const tagB = (b.tag || '').toLowerCase();
+        if (!tagA && !tagB) return 0;
+        if (!tagA) return 1;
+        if (!tagB) return -1;
+        if (tagA !== tagB) return tagA.localeCompare(tagB);
+        return 0; // keep relative order within same tag
+      });
+      const orderedIds = sorted.map(l => l.id);
+      await updateLinkSortOrders(orderedIds);
+      renderBoard(params);
+      showToast('Ordinato per tag');
+    });
+  }
+
   // Export all button
   const exportAllBtn = document.getElementById('btn-export-all');
   if (exportAllBtn) {
@@ -191,6 +213,9 @@ function initDragDrop(boardId) {
   const listEl = document.getElementById('link-list');
   if (!listEl) return;
 
+  let multiDragIds = []; // IDs being multi-dragged
+  let multiDragEls = []; // DOM elements removed during multi-drag
+
   Sortable.create(listEl, {
     handle: '.link-card-drag',
     animation: 200,
@@ -202,11 +227,54 @@ function initDragDrop(boardId) {
     delayOnTouchOnly: true,
     touchStartThreshold: 3,
     fallbackTolerance: 3,
+    onStart: (evt) => {
+      const draggedId = evt.item.dataset.id;
+      // If dragging a selected card and there are multiple selections, do multi-drag
+      if (selectedIds.has(draggedId) && selectedIds.size > 1) {
+        multiDragIds = [];
+        multiDragEls = [];
+        // Collect selected cards (except the one being dragged)
+        const allCards = Array.from(listEl.querySelectorAll('.link-card'));
+        for (const card of allCards) {
+          if (card.dataset.id !== draggedId && selectedIds.has(card.dataset.id)) {
+            multiDragIds.push(card.dataset.id);
+            multiDragEls.push(card);
+            card.style.display = 'none'; // hide during drag
+          }
+        }
+        // Add badge to dragged item showing count
+        const badge = document.createElement('span');
+        badge.className = 'multi-drag-badge';
+        badge.textContent = selectedIds.size;
+        evt.item.appendChild(badge);
+      } else {
+        multiDragIds = [];
+        multiDragEls = [];
+      }
+    },
     onEnd: async (evt) => {
-      if (evt.oldIndex === evt.newIndex) return;
-      const cards = listEl.querySelectorAll('.link-card');
-      const orderedIds = Array.from(cards).map(c => c.dataset.id);
-      await updateLinkSortOrders(orderedIds);
+      // Remove badge
+      const badge = evt.item.querySelector('.multi-drag-badge');
+      if (badge) badge.remove();
+
+      if (multiDragEls.length > 0) {
+        // Re-insert hidden cards right after the dragged card
+        for (const el of multiDragEls) {
+          el.style.display = '';
+          evt.item.after(el);
+        }
+        // Now persist new order
+        const cards = listEl.querySelectorAll('.link-card');
+        const orderedIds = Array.from(cards).map(c => c.dataset.id);
+        await updateLinkSortOrders(orderedIds);
+        multiDragIds = [];
+        multiDragEls = [];
+      } else {
+        if (evt.oldIndex === evt.newIndex) return;
+        const cards = listEl.querySelectorAll('.link-card');
+        const orderedIds = Array.from(cards).map(c => c.dataset.id);
+        await updateLinkSortOrders(orderedIds);
+      }
     }
   });
 }
@@ -234,12 +302,15 @@ function renderLinkCard(link, hasSummary, isSelected) {
   `;
 }
 
-// Tag color from string hash
+// Tag color — HSL-based, always unique per tag string
 function tagColor(tag) {
-  const colors = ['#e74c8b','#8b5cf6','#3b82f6','#06b6d4','#10b981','#f59e0b','#ef4444','#ec4899','#6366f1','#14b8a6'];
   let hash = 0;
   for (let i = 0; i < tag.length; i++) hash = ((hash << 5) - hash) + tag.charCodeAt(i);
-  return colors[Math.abs(hash) % colors.length];
+  hash = Math.abs(hash);
+  const hue = hash % 360;
+  const sat = 55 + (hash >> 8) % 25;   // 55–80%
+  const lit = 45 + (hash >> 16) % 15;   // 45–60%
+  return `hsl(${hue}, ${sat}%, ${lit}%)`;
 }
 
 // === Action Bar ===

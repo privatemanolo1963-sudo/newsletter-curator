@@ -491,6 +491,7 @@ body {
   gap: 12px;
   box-shadow: var(--shadow);
   transition: background 0.15s;
+  position: relative;
 }
 
 .link-card-drag {
@@ -521,6 +522,25 @@ body {
 
 .link-card-dragging {
   opacity: 0;
+}
+
+/* Multi-drag badge */
+.multi-drag-badge {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 8px rgba(233, 69, 96, 0.5);
+  pointer-events: none;
 }
 
 .link-card-content {
