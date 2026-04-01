@@ -600,11 +600,34 @@ function showDeleteLinksConfirm(boardId) {
 function exportLinksViaMail(boardName, links) {
   const subject = encodeURIComponent(boardName);
   let bodyLines = [`${boardName} — Link selezionati\n`];
-  links.forEach((link, i) => {
-    bodyLines.push(`${i + 1}. ${link.title}`);
-    if (link.tag) bodyLines.push(`   Sezione: ${link.tag}`);
-    bodyLines.push(`   ${link.url}\n`);
+
+  // Sort by tag (alphabetical), untagged at bottom
+  const sorted = [...links].sort((a, b) => {
+    const tagA = (a.tag || '').toLowerCase();
+    const tagB = (b.tag || '').toLowerCase();
+    if (!tagA && !tagB) return 0;
+    if (!tagA) return 1;
+    if (!tagB) return -1;
+    if (tagA !== tagB) return tagA.localeCompare(tagB);
+    return (a.sortOrder || 0) - (b.sortOrder || 0);
   });
+
+  let currentTag = null;
+  let counter = 1;
+  for (const link of sorted) {
+    const tag = link.tag || '';
+    if (tag !== currentTag) {
+      currentTag = tag;
+      if (tag) {
+        bodyLines.push(`\n— ${tag} —\n`);
+      } else {
+        bodyLines.push(`\n— Senza sezione —\n`);
+      }
+    }
+    bodyLines.push(`${counter}. ${link.title}`);
+    bodyLines.push(`   ${link.url}\n`);
+    counter++;
+  }
   const bodyText = bodyLines.join('\n');
 
   // mailto has ~2000 char limit
