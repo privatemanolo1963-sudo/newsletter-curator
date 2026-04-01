@@ -90,7 +90,7 @@ async function publishToWordPress(title, content) {
     body: JSON.stringify({
       title: title,
       content: content,
-      status: 'private'
+      status: 'publish'
     })
   });
 
