@@ -24,8 +24,17 @@ function renderSettings() {
       </div>
 
       <div class="settings-section">
-        <div class="settings-label">Dati</div>
-        <div class="settings-description">Esporta o importa un backup completo di board e link.</div>
+        <div class="settings-label">Backup Cloud</div>
+        <div class="settings-description">Salva e ripristina tutti i dati (board, link) su humansai.it. Usa il backup prima di cancellare la cache del browser.</div>
+        <div class="settings-key-actions">
+          <button class="btn btn-primary" id="btn-backup-wp" style="flex:1">Backup</button>
+          <button class="btn btn-secondary" id="btn-restore-wp" style="flex:1">Ripristina</button>
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <div class="settings-label">Dati locali</div>
+        <div class="settings-description">Esporta o importa un backup come file JSON.</div>
         <div class="settings-key-actions">
           <button class="btn btn-secondary" id="btn-export-data" style="flex:1">Esporta JSON</button>
           <button class="btn btn-secondary" id="btn-import-data" style="flex:1">Importa JSON</button>
@@ -35,7 +44,7 @@ function renderSettings() {
 
       <div class="settings-section">
         <div class="settings-label">Info</div>
-        <div class="settings-description">Newsletter Curator v1.1<br>PWA per raccolta e curation link.</div>
+        <div class="settings-description">Newsletter Curator v1.2<br>PWA per raccolta e curation link.</div>
       </div>
     </div>
   `;
@@ -69,6 +78,37 @@ function renderSettings() {
     setWpCredentials(null);
     showToast('Credenziali WordPress eliminate');
     renderSettings();
+  });
+
+  // Backup to WordPress
+  document.getElementById('btn-backup-wp').addEventListener('click', async () => {
+    const btn = document.getElementById('btn-backup-wp');
+    btn.textContent = '...';
+    btn.disabled = true;
+    try {
+      await backupToWordPress();
+      showToast('Backup completato');
+    } catch (err) {
+      showToast('Errore: ' + err.message);
+    }
+    btn.textContent = 'Backup';
+    btn.disabled = false;
+  });
+
+  // Restore from WordPress
+  document.getElementById('btn-restore-wp').addEventListener('click', async () => {
+    const btn = document.getElementById('btn-restore-wp');
+    btn.textContent = '...';
+    btn.disabled = true;
+    try {
+      await restoreFromWordPress();
+      showToast('Dati ripristinati');
+      renderSettings();
+    } catch (err) {
+      showToast('Errore: ' + err.message);
+    }
+    btn.textContent = 'Ripristina';
+    btn.disabled = false;
   });
 
   // Export data
