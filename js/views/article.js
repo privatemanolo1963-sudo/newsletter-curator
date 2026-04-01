@@ -351,3 +351,54 @@ function setApiKey(key) {
     localStorage.removeItem('curator_api_key');
   }
 }
+
+// === WordPress Credentials ===
+
+function getWpCredentials() {
+  const data = localStorage.getItem('curator_wp_credentials');
+  if (!data) return null;
+  try {
+    const parsed = JSON.parse(atob(data));
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function setWpCredentials(siteUrl, user, appPassword) {
+  if (siteUrl && user && appPassword) {
+    const data = { siteUrl: siteUrl.replace(/\/+$/, ''), user, appPassword };
+    localStorage.setItem('curator_wp_credentials', btoa(JSON.stringify(data)));
+  } else {
+    localStorage.removeItem('curator_wp_credentials');
+  }
+}
+
+async function publishToWordPress(title, content) {
+  const creds = getWpCredentials();
+  if (!creds) throw new Error('Credenziali WordPress non configurate. Vai in Impostazioni.');
+
+  const endpoint = creds.siteUrl + '/wp-json/wp/v2/posts';
+  const auth = btoa(creds.user + ':' + creds.appPassword);
+
+  const res = await fetch(endpoint, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': 'Basic ' + auth
+    },
+    body: JSON.stringify({
+      title: title,
+      content: content,
+      status: 'private'
+    })
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err.message || 'Errore WordPress (' + res.status + ')');
+  }
+
+  const post = await res.json();
+  return post.link;
+}

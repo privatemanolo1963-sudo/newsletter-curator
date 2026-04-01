@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "dev",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["C:\\Users\\MatteoMontan\\OneDrive - Aisemplice.biz S.R.L\\Desktop\\Claude Code\\newsletter-curator\\serve.py"],
+      "port": 8080
+    }
+  ]
+}

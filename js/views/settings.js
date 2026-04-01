@@ -3,6 +3,7 @@
 function renderSettings() {
   const app = document.getElementById('app');
   const currentKey = getApiKey();
+  const wpCreds = getWpCredentials();
 
   app.innerHTML = `
     <div class="view-enter">
@@ -19,6 +20,18 @@ function renderSettings() {
           <button class="btn btn-primary" id="btn-save-key" style="flex:1">Salva</button>
           ${currentKey ? '<button class="btn btn-secondary" id="btn-show-key" style="flex:0.6">Mostra</button>' : ''}
           ${currentKey ? '<button class="btn btn-danger" id="btn-delete-key" style="flex:0.6">Elimina</button>' : ''}
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <div class="settings-label">WordPress</div>
+        <div class="settings-description">Per pubblicare note (articoli senza URL) come post privati su humansai.it.</div>
+        <input class="modal-input" id="wp-site-input" type="url" placeholder="https://www.humansai.it" value="${wpCreds ? wpCreds.siteUrl : 'https://www.humansai.it'}" autocomplete="off" style="margin-bottom:8px">
+        <input class="modal-input" id="wp-user-input" type="text" placeholder="Username WordPress" value="${wpCreds ? wpCreds.user : ''}" autocomplete="off" style="margin-bottom:8px">
+        <input class="modal-input" id="wp-pass-input" type="password" placeholder="Application Password" value="${wpCreds ? '••••••••••••••••' : ''}" autocomplete="off">
+        <div class="settings-key-actions">
+          <button class="btn btn-primary" id="btn-save-wp" style="flex:1">Salva</button>
+          ${wpCreds ? '<button class="btn btn-danger" id="btn-delete-wp" style="flex:0.6">Elimina</button>' : ''}
         </div>
       </div>
 
@@ -74,6 +87,33 @@ function renderSettings() {
     keyInput.value = '';
     keyInput.type = 'password';
     showToast('API key eliminata');
+    renderSettings();
+  });
+
+  // Save WP credentials
+  document.getElementById('btn-save-wp').addEventListener('click', () => {
+    const site = document.getElementById('wp-site-input').value.trim();
+    const user = document.getElementById('wp-user-input').value.trim();
+    const pass = document.getElementById('wp-pass-input').value.trim();
+    if (!site || !user || !pass || pass.startsWith('•')) {
+      if (pass.startsWith('•') && wpCreds) {
+        // Only site/user changed, keep existing password
+        setWpCredentials(site, user, wpCreds.appPassword);
+      } else {
+        showToast('Compila tutti i campi');
+        return;
+      }
+    } else {
+      setWpCredentials(site, user, pass);
+    }
+    showToast('Credenziali WordPress salvate');
+    renderSettings();
+  });
+
+  // Delete WP credentials
+  document.getElementById('btn-delete-wp')?.addEventListener('click', () => {
+    setWpCredentials(null);
+    showToast('Credenziali WordPress eliminate');
     renderSettings();
   });
 

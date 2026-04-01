@@ -1318,3 +1318,11 @@ body {
   0% { background-position: 200% 0; }
   100% { background-position: -200% 0; }
 }
+
+/* === Note Textarea === */
+.note-textarea {
+  min-height: 250px;
+  resize: vertical;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}

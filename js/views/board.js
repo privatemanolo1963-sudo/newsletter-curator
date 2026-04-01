@@ -24,6 +24,7 @@ async function renderBoard(params) {
       <div class="board-header">
         <button class="btn-back" id="btn-back" title="Indietro">&#8592;</button>
         <input class="board-title-input" id="board-title" value="${escapeHtml(board.name)}" spellcheck="false">
+        <button class="btn-header-action" id="btn-paste-note" title="Incolla articolo">Note</button>
         <button class="btn-header-action" id="btn-sort-tag" title="Ordina per tag">Tag</button>
         <button class="btn-header-action" id="btn-export-all" title="Esporta tutti">Mail</button>
         <button class="btn-header-action" id="btn-view-summaries" title="Riassunti">Sum</button>
@@ -203,6 +204,14 @@ async function renderBoard(params) {
   if (viewSummariesBtn) {
     viewSummariesBtn.addEventListener('click', () => {
       Router.navigate('#/board/' + boardId + '/summaries');
+    });
+  }
+
+  // Paste note button
+  const pasteNoteBtn = document.getElementById('btn-paste-note');
+  if (pasteNoteBtn) {
+    pasteNoteBtn.addEventListener('click', () => {
+      showNoteModal(boardId, params);
     });
   }
 }
@@ -725,6 +734,61 @@ async function showTagModal(linkId, boardId, params) {
   });
   overlay.addEventListener('click', (e) => {
     if (e.target === overlay) close();
+  });
+}
+
+// === Note Modal (Paste Article → WordPress) ===
+
+function showNoteModal(boardId, params) {
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.innerHTML = `
+    <div class="modal">
+      <h2>Incolla articolo</h2>
+      <input class="modal-input" id="note-title-input" type="text" placeholder="Titolo dell'articolo..." maxlength="200" autofocus style="margin-bottom:12px">
+      <textarea class="modal-input note-textarea" id="note-content-input" placeholder="Incolla qui il testo dell'articolo..."></textarea>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" id="note-cancel">Annulla</button>
+        <button class="btn btn-primary" id="note-save">Pubblica</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+
+  const close = () => overlay.remove();
+
+  document.getElementById('note-cancel').addEventListener('click', close);
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) close();
+  });
+
+  document.getElementById('note-save').addEventListener('click', async () => {
+    const title = document.getElementById('note-title-input').value.trim();
+    const content = document.getElementById('note-content-input').value.trim();
+
+    if (!title) { showToast('Inserisci un titolo'); return; }
+    if (!content) { showToast('Inserisci il testo'); return; }
+
+    const saveBtn = document.getElementById('note-save');
+    saveBtn.textContent = '...';
+    saveBtn.disabled = true;
+
+    try {
+      // Convert plain text to HTML paragraphs
+      const htmlContent = content.split(/\n\n+/).map(p => '<p>' + escapeHtml(p.trim()) + '</p>').join('\n');
+      const wpUrl = await publishToWordPress(title, htmlContent);
+
+      // Save as a normal link in the board
+      const domain = extractDomain(wpUrl);
+      await addLink(boardId, wpUrl, title, domain);
+      close();
+      renderBoard(params);
+      showToast('Nota pubblicata e salvata');
+    } catch (err) {
+      saveBtn.textContent = 'Pubblica';
+      saveBtn.disabled = false;
+      showToast('Errore: ' + err.message);
+    }
   });
 }
 
