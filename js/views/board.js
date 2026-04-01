@@ -761,8 +761,12 @@ function showNoteModal(boardId, params) {
     saveBtn.disabled = true;
 
     try {
-      // Convert plain text to HTML paragraphs
-      const htmlContent = content.split(/\n\n+/).map(p => '<p>' + escapeHtml(p.trim()) + '</p>').join('\n');
+      // Convert plain text to HTML paragraphs, auto-linking URLs
+      const linkify = (text) => escapeHtml(text).replace(
+        /(https?:\/\/[^\s<]+)/g,
+        '<a href="$1" target="_blank" rel="noopener">$1</a>'
+      );
+      const htmlContent = content.split(/\n\n+/).map(p => '<p>' + linkify(p.trim()) + '</p>').join('\n');
       const wpUrl = await publishToWordPress(title, htmlContent);
 
       // Save as a normal link in the board
