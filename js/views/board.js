@@ -13,9 +13,6 @@ async function renderBoard(params) {
   }
 
   const links = await getBoardLinks(boardId);
-  // Load summaries to show badges
-  const summaries = await getBoardSummaries(boardId);
-  const summaryLinkIds = new Set(summaries.map(s => s.linkId));
 
   const app = document.getElementById('app');
 
@@ -27,7 +24,6 @@ async function renderBoard(params) {
         <button class="btn-header-action" id="btn-paste-note" title="Incolla articolo">Note</button>
         <button class="btn-header-action" id="btn-sort-tag" title="Ordina per tag">Tag</button>
         <button class="btn-header-action" id="btn-export-all" title="Esporta tutti">Mail</button>
-        <button class="btn-header-action" id="btn-view-summaries" title="Riassunti">Sum</button>
       </div>
       <div class="link-input-bar">
         <div class="link-input-wrapper">
@@ -47,9 +43,8 @@ async function renderBoard(params) {
   } else {
     html += '<div class="link-list" id="link-list">';
     for (const link of links) {
-      const hasSummary = summaryLinkIds.has(link.id);
       const isSelected = selectedIds.has(link.id);
-      html += renderLinkCard(link, hasSummary, isSelected);
+      html += renderLinkCard(link, isSelected);
     }
     html += '</div>';
 
@@ -199,14 +194,6 @@ async function renderBoard(params) {
     });
   }
 
-  // View summaries button
-  const viewSummariesBtn = document.getElementById('btn-view-summaries');
-  if (viewSummariesBtn) {
-    viewSummariesBtn.addEventListener('click', () => {
-      Router.navigate('#/board/' + boardId + '/summaries');
-    });
-  }
-
   // Paste note button
   const pasteNoteBtn = document.getElementById('btn-paste-note');
   if (pasteNoteBtn) {
@@ -290,7 +277,7 @@ function initDragDrop(boardId) {
 
 // === Link Card Rendering ===
 
-function renderLinkCard(link, hasSummary, isSelected) {
+function renderLinkCard(link, isSelected) {
   const tag = link.tag || '';
   const tagHtml = tag
     ? `<span class="link-card-tag" data-id="${link.id}" style="background:${tagColor(tag)}">${escapeHtml(tag)}</span>`

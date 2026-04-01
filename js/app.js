@@ -4,7 +4,6 @@
 Router.register('#/', renderHome);
 Router.register('#/board/:id', renderBoard);
 Router.register('#/board/:boardId/link/:linkId', renderArticle);
-Router.register('#/board/:id/summaries', renderSummaries);
 Router.register('#/settings', renderSettings);
 
 // One-time migration: reverse existing link order (newest first)
