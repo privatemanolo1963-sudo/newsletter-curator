@@ -1,4 +1,4 @@
-const CACHE_NAME = 'curator-v17';
+const CACHE_NAME = 'curator-v18';
 const ASSETS = [
   './index.html',
   './css/style.css',
@@ -29,18 +29,22 @@ self.addEventListener('activate', (e) => {
 });
 
 self.addEventListener('fetch', (e) => {
-  // Network first for everything — ensures fresh content
-  if (e.request.url.includes('wp-json') || e.request.url.includes('r.jina.ai')) {
-    e.respondWith(fetch(e.request).catch(() => caches.match(e.request)));
-  } else {
-    e.respondWith(
-      fetch(e.request)
-        .then((response) => {
-          const clone = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(e.request, clone));
-          return response;
-        })
-        .catch(() => caches.match(e.request))
-    );
+  // Skip non-GET requests (POST to WordPress, etc.)
+  if (e.request.method !== 'GET') return;
+
+  // Skip external API calls — let them go directly to network
+  if (e.request.url.includes('wp-json') || e.request.url.includes('r.jina.ai') || e.request.url.includes('api.microlink.io')) {
+    return;
   }
+
+  // App assets: network first, cache fallback
+  e.respondWith(
+    fetch(e.request)
+      .then((response) => {
+        const clone = response.clone();
+        caches.open(CACHE_NAME).then((cache) => cache.put(e.request, clone));
+        return response;
+      })
+      .catch(() => caches.match(e.request))
+  );
 });
