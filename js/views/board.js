@@ -15,6 +15,7 @@ async function renderBoard(params) {
   const links = await getBoardLinks(boardId);
 
   const app = document.getElementById('app');
+  window.scrollTo(0, 0);
 
   let html = `
     <div class="view-enter">
@@ -761,17 +762,28 @@ function showNoteModal(boardId, params) {
     saveBtn.disabled = true;
 
     try {
+      // Save placeholder link in DB FIRST (before WP call that can break IndexedDB)
+      const tempUrl = 'https://humansai.it/pending-' + Date.now();
+      const domain = 'humansai.it';
+      const newLink = await addLink(boardId, tempUrl, title, domain);
+
       // Convert plain text to HTML paragraphs, auto-linking URLs
       const linkify = (text) => escapeHtml(text).replace(
         /(https?:\/\/[^\s<]+)/g,
         '<a href="$1" target="_blank" rel="noopener">$1</a>'
       );
       const htmlContent = content.split(/\n\n+/).map(p => '<p>' + linkify(p.trim()) + '</p>').join('\n');
-      const wpUrl = await publishToWordPress(title, htmlContent);
 
-      // Save as a normal link in the board
-      const domain = extractDomain(wpUrl);
-      await addLink(boardId, wpUrl, title, domain);
+      try {
+        const wpUrl = await publishToWordPress(title, htmlContent);
+        // Update the placeholder with real WP URL
+        await db.links.update(newLink.id, { url: wpUrl, domain: extractDomain(wpUrl), updatedAt: Date.now() });
+      } catch (wpErr) {
+        // WP failed — remove placeholder
+        await db.links.delete(newLink.id).catch(() => {});
+        throw wpErr;
+      }
+
       close();
       renderBoard(params);
       showToast('Nota pubblicata e salvata');

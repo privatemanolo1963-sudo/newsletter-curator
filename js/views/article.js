@@ -11,6 +11,7 @@ async function renderArticle(params) {
   }
 
   const app = document.getElementById('app');
+  window.scrollTo(0, 0);
 
   app.innerHTML = `
     <div class="view-enter">
