@@ -256,10 +256,12 @@ function initDragDrop(boardId) {
       if (badge) badge.remove();
 
       if (multiDragEls.length > 0) {
-        // Re-insert hidden cards right after the dragged card
+        // Re-insert hidden cards in correct order after the dragged card
+        let insertAfter = evt.item;
         for (const el of multiDragEls) {
           el.style.display = '';
-          evt.item.after(el);
+          insertAfter.after(el);
+          insertAfter = el;
         }
         // Now persist new order
         const cards = listEl.querySelectorAll('.link-card');

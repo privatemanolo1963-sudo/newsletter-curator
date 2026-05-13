@@ -1,4 +1,4 @@
-const CACHE_NAME = 'curator-v21';
+const CACHE_NAME = 'curator-v22';
 const ASSETS = [
   './index.html',
   './css/style.css',
