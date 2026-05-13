@@ -334,7 +334,6 @@ function updateActionBar(boardId, boardName, links) {
     <button class="btn btn-secondary" id="action-move">Sposta</button>
     <button class="btn btn-secondary" id="action-copy">Copia</button>
     <button class="btn btn-danger" id="action-delete">Elimina</button>
-    <button class="btn btn-primary" id="action-export">Mail</button>
   `;
   document.body.appendChild(bar);
 
@@ -367,12 +366,6 @@ function updateActionBar(boardId, boardName, links) {
     showDeleteLinksConfirm(boardId);
   });
 
-  // Export selected via mail
-  document.getElementById('action-export').addEventListener('click', async () => {
-    const freshLinks = await getBoardLinks(boardId);
-    const selectedLinks = freshLinks.filter(l => selectedIds.has(l.id));
-    exportLinksViaMail(boardName, selectedLinks);
-  });
 }
 
 // === Move Modal ===
