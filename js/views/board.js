@@ -852,6 +852,26 @@ async function fetchLinkMeta(url) {
   const fullUrl = url.startsWith('http') ? url : 'https://' + url;
   const domain = extractDomain(fullUrl);
 
+  // Detect URL slug: all lowercase, hyphens, no spaces → convert to readable title
+  const slugToTitle = (str) => {
+    if (/^[a-z0-9]+(-[a-z0-9]+){2,}$/.test(str)) {
+      return str.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+    }
+    return str;
+  };
+
+  // Extract title from URL path as last-resort fallback
+  const titleFromUrl = () => {
+    try {
+      const path = new URL(fullUrl).pathname.replace(/\/$/, '');
+      const lastSegment = path.split('/').pop() || '';
+      if (lastSegment && /^[a-z0-9]+(-[a-z0-9]+){2,}$/.test(lastSegment)) {
+        return slugToTitle(lastSegment);
+      }
+    } catch {}
+    return '';
+  };
+
   // Try Microlink API first (best for metadata extraction)
   try {
     const controller = new AbortController();
@@ -867,8 +887,10 @@ async function fetchLinkMeta(url) {
       if (title) {
         // Skip error pages
         if (/^(404|403|error|page not found)/i.test(title)) title = '';
-        // Only strip suffix if it matches a short site name pattern (e.g. " | TechCrunch")
-        else title = title.replace(/\s*[\|\-–—]\s*[\w\s]{1,25}$/, '').trim();
+        // Convert slug-like titles to readable text
+        else title = slugToTitle(title);
+        // Strip suffix like " | TechCrunch"
+        if (title) title = title.replace(/\s*[\|\-–—]\s*[\w\s]{1,25}$/, '').trim();
         if (title.length > 5 && title.toLowerCase() !== domain) return { title, domain };
       }
     }
@@ -888,12 +910,17 @@ async function fetchLinkMeta(url) {
 
     if (response.ok) {
       const data = await response.json();
-      const title = data.data?.title || data.title || '';
+      let title = data.data?.title || data.title || '';
+      if (title) title = slugToTitle(title);
       if (title && title !== domain) return { title, domain };
     }
   } catch (e) {
     // Jina also failed
   }
+
+  // Last resort: extract readable title from URL slug
+  const urlTitle = titleFromUrl();
+  if (urlTitle) return { title: urlTitle, domain };
 
   return { title: domain, domain };
 }
