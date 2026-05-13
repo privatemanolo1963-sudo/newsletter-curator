@@ -190,8 +190,9 @@ async function renderBoard(params) {
   // Export all button
   const exportAllBtn = document.getElementById('btn-export-all');
   if (exportAllBtn) {
-    exportAllBtn.addEventListener('click', () => {
-      exportLinksViaMail(board.name, links);
+    exportAllBtn.addEventListener('click', async () => {
+      const freshLinks = await getBoardLinks(boardId);
+      exportLinksViaMail(board.name, freshLinks);
     });
   }
 
@@ -365,8 +366,9 @@ function updateActionBar(boardId, boardName, links) {
   });
 
   // Export selected via mail
-  document.getElementById('action-export').addEventListener('click', () => {
-    const selectedLinks = links.filter(l => selectedIds.has(l.id));
+  document.getElementById('action-export').addEventListener('click', async () => {
+    const freshLinks = await getBoardLinks(boardId);
+    const selectedLinks = freshLinks.filter(l => selectedIds.has(l.id));
     exportLinksViaMail(boardName, selectedLinks);
   });
 }
@@ -598,16 +600,8 @@ function exportLinksViaMail(boardName, links) {
   const subject = encodeURIComponent(boardName);
   let bodyLines = [`${boardName} — Link selezionati\n`];
 
-  // Sort by tag (alphabetical), untagged at bottom
-  const sorted = [...links].sort((a, b) => {
-    const tagA = (a.tag || '').toLowerCase();
-    const tagB = (b.tag || '').toLowerCase();
-    if (!tagA && !tagB) return 0;
-    if (!tagA) return 1;
-    if (!tagB) return -1;
-    if (tagA !== tagB) return tagA.localeCompare(tagB);
-    return (a.sortOrder || 0) - (b.sortOrder || 0);
-  });
+  // Use current visual order (sortOrder from drag & drop), no re-sorting
+  const sorted = [...links].sort((a, b) => (a.sortOrder || 0) - (b.sortOrder || 0));
 
   let currentTag = null;
   let counter = 1;
@@ -734,7 +728,7 @@ function showNoteModal(boardId, params) {
     <div class="modal">
       <h2>Incolla articolo</h2>
       <input class="modal-input" id="note-title-input" type="text" placeholder="Titolo dell'articolo..." maxlength="200" autofocus style="margin-bottom:12px">
-      <textarea class="modal-input note-textarea" id="note-content-input" placeholder="Incolla qui il testo dell'articolo..."></textarea>
+      <div class="modal-input note-textarea" id="note-content-input" contenteditable="true" data-placeholder="Incolla qui il testo dell'articolo..."></div>
       <div class="modal-actions">
         <button class="btn btn-secondary" id="note-cancel">Annulla</button>
         <button class="btn btn-primary" id="note-save">Pubblica</button>
@@ -752,10 +746,12 @@ function showNoteModal(boardId, params) {
 
   document.getElementById('note-save').addEventListener('click', async () => {
     const title = document.getElementById('note-title-input').value.trim();
-    const content = document.getElementById('note-content-input').value.trim();
+    const contentEl = document.getElementById('note-content-input');
+    const rawHtml = contentEl.innerHTML.trim();
+    const textContent = contentEl.textContent.trim();
 
     if (!title) { showToast('Inserisci un titolo'); return; }
-    if (!content) { showToast('Inserisci il testo'); return; }
+    if (!textContent) { showToast('Inserisci il testo'); return; }
 
     const saveBtn = document.getElementById('note-save');
     saveBtn.textContent = '...';
@@ -767,12 +763,48 @@ function showNoteModal(boardId, params) {
       const domain = 'humansai.it';
       const newLink = await addLink(boardId, tempUrl, title, domain);
 
-      // Convert plain text to HTML paragraphs, auto-linking URLs
-      const linkify = (text) => escapeHtml(text).replace(
-        /(https?:\/\/[^\s<]+)/g,
-        '<a href="$1" target="_blank" rel="noopener">$1</a>'
-      );
-      const htmlContent = content.split(/\n\n+/).map(p => '<p>' + linkify(p.trim()) + '</p>').join('\n');
+      // Sanitize pasted HTML: keep only safe tags and links
+      const sanitizeNoteHtml = (html) => {
+        const temp = document.createElement('div');
+        temp.innerHTML = html;
+        // Preserve <a> hrefs, strip dangerous attributes
+        temp.querySelectorAll('a').forEach(a => {
+          const href = a.getAttribute('href') || '';
+          // Keep only http(s) links
+          if (!href.match(/^https?:\/\//)) {
+            a.replaceWith(a.textContent);
+          } else {
+            // Clean attributes, keep only href
+            const text = a.innerHTML;
+            a.removeAttribute('style');
+            a.removeAttribute('class');
+            a.removeAttribute('id');
+            a.setAttribute('target', '_blank');
+            a.setAttribute('rel', 'noopener');
+          }
+        });
+        // Strip all tags except allowed ones
+        const allowed = ['A', 'P', 'BR', 'STRONG', 'B', 'EM', 'I'];
+        const walk = (node) => {
+          const children = Array.from(node.childNodes);
+          for (const child of children) {
+            if (child.nodeType === 1) { // Element
+              if (!allowed.includes(child.tagName)) {
+                // Replace with its children (unwrap)
+                while (child.firstChild) child.parentNode.insertBefore(child.firstChild, child);
+                child.remove();
+              } else {
+                walk(child);
+              }
+            }
+          }
+        };
+        walk(temp);
+        return temp.innerHTML;
+      };
+
+      // Build HTML content: sanitize pasted rich text, wrap loose text in <p>
+      const htmlContent = sanitizeNoteHtml(rawHtml);
 
       try {
         const wpUrl = await publishToWordPress(title, htmlContent);

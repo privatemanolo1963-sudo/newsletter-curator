@@ -476,7 +476,7 @@ body {
 
 /* === Link Cards === */
 .link-list {
-  padding: 0 20px 20px;
+  padding: 0 20px 80px;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -775,6 +775,7 @@ body {
   display: flex;
   align-items: center;
   padding: 16px 20px;
+  padding-top: calc(16px + var(--safe-top));
   gap: 12px;
   position: sticky;
   top: 0;
@@ -1319,10 +1320,23 @@ body {
   100% { background-position: -200% 0; }
 }
 
-/* === Note Textarea === */
+/* === Note Content Editable === */
 .note-textarea {
   min-height: 250px;
-  resize: vertical;
+  max-height: 50vh;
+  overflow-y: auto;
   line-height: 1.6;
   white-space: pre-wrap;
+  -webkit-overflow-scrolling: touch;
+}
+
+.note-textarea:empty::before {
+  content: attr(data-placeholder);
+  color: var(--text-muted);
+  pointer-events: none;
+}
+
+.note-textarea a {
+  color: var(--accent);
+  text-decoration: underline;
 }
