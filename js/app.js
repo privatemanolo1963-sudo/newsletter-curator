@@ -25,6 +25,9 @@ Router.register('#/settings', renderSettings);
 // Start router
 Router.init();
 
+// Avvia il backup automatico su WordPress
+initAutoBackup();
+
 // Register service worker
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('./sw.js').catch(() => {
