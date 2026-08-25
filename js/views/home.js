@@ -72,6 +72,9 @@ async function renderHome() {
   document.getElementById('btn-settings').addEventListener('click', () => {
     Router.navigate('#/settings');
   });
+
+  // Avviso stato backup
+  updateBackupBanner();
 }
 
 function showNewBoardModal() {

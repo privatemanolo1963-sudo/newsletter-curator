@@ -135,14 +135,8 @@ async function restoreFromWordPress() {
 
   if (posts.length === 0) throw new Error('Nessun backup trovato');
 
-  // Content is stored as raw JSON in the post content
-  let raw = posts[0].content.rendered || posts[0].content;
-  // Strip HTML tags that WP might wrap around the content
-  raw = raw.replace(/<[^>]*>/g, '').trim();
-  // Decode HTML entities
-  const txt = document.createElement('textarea');
-  txt.innerHTML = raw;
-  const data = JSON.parse(txt.value);
+  // Il contenuto puo' essere in base64 (formato nuovo) o JSON in chiaro (formato vecchio)
+  const data = decodePayload(posts[0].content.rendered || posts[0].content);
 
   // Restore WP credentials first (so they survive the import)
   const wpCreds = data.wpCredentials;
