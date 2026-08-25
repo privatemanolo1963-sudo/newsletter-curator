@@ -1340,3 +1340,48 @@ body {
   color: var(--accent);
   text-decoration: underline;
 }
+
+/* === Stato backup === */
+.backup-banner {
+  margin: 0 16px 12px;
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  line-height: 1.35;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+
+.backup-banner-danger {
+  background: rgba(231, 76, 60, 0.15);
+  border-color: var(--danger);
+  color: #ffb3ab;
+}
+
+.backup-banner-warn {
+  background: rgba(233, 69, 96, 0.10);
+  border-color: var(--border);
+  color: var(--text-secondary);
+}
+
+.settings-backup-status {
+  margin: 8px 0 12px;
+  padding: 9px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  line-height: 1.35;
+  background: var(--bg-input);
+  color: var(--text-secondary);
+  border: 1px solid var(--border);
+}
+
+.settings-backup-danger {
+  background: rgba(231, 76, 60, 0.15);
+  border-color: var(--danger);
+  color: #ffb3ab;
+}
+
+.settings-backup-ok {
+  color: var(--text-secondary);
+}
