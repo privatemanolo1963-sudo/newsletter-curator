@@ -679,6 +679,14 @@ body {
   margin-left: 3px;
 }
 
+/* Gestione tag: elenco scorrevole se i tag sono tanti */
+.tag-manager-list {
+  max-height: 60vh;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 2px;
+}
+
 .rename-tag-note {
   margin-top: 12px;
 }

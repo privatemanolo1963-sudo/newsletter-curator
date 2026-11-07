@@ -766,9 +766,65 @@ async function showTagModal(linkId, boardId, params) {
   });
 }
 
+// === Tag Manager (da Impostazioni: rinomina ed elimina senza partire da un link) ===
+
+async function showTagManager() {
+  await syncTagRecords();
+  const allLinks = await db.links.toArray();
+  const existingTags = [...new Set(allLinks.map(l => l.tag).filter(Boolean))].sort();
+
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  const listHtml = existingTags.length > 0
+    ? `<div class="tag-presets tag-manager-list">${existingTags.map(t =>
+        `<span class="tag-preset-wrap">` +
+        `<span class="tag-preset" style="background:${tagColor(t)}">${escapeHtml(t)}</span>` +
+        `<button class="tag-preset-edit" data-tag="${escapeHtml(t)}" title="Rinomina tag">&#9998;</button>` +
+        `<button class="tag-preset-delete" data-tag="${escapeHtml(t)}" title="Elimina tag">&times;</button>` +
+        `</span>`
+      ).join('')}</div>`
+    : '<p class="confirm-text">Nessun tag.</p>';
+
+  overlay.innerHTML = `
+    <div class="modal">
+      <h2>Tag</h2>
+      ${listHtml}
+      <div class="modal-actions">
+        <button class="btn btn-secondary" id="tag-manager-close">Chiudi</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+
+  const close = () => overlay.remove();
+  document.getElementById('tag-manager-close').addEventListener('click', close);
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) close();
+  });
+
+  overlay.querySelectorAll('.tag-preset-delete').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const tagToDelete = btn.dataset.tag;
+      const count = await deleteTag(tagToDelete);
+      showToast(`Tag "${tagToDelete}" eliminato da ${count} link`);
+      close();
+      showTagManager();
+    });
+  });
+
+  overlay.querySelectorAll('.tag-preset-edit').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      close();
+      showRenameTagModal(btn.dataset.tag, null, showTagManager);
+    });
+  });
+}
+
 // === Rename Tag Modal ===
 
-function showRenameTagModal(oldName, params) {
+function showRenameTagModal(oldName, params, onDone) {
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay';
   overlay.innerHTML = `
@@ -788,6 +844,8 @@ function showRenameTagModal(oldName, params) {
   input.focus();
   input.select();
   const close = () => overlay.remove();
+  // Annullando si torna da dove si era partiti (board o gestione dei tag)
+  const cancel = () => { close(); if (onDone) onDone(); };
 
   const apply = async (newName) => {
     const res = await renameTag(oldName, newName);
@@ -795,12 +853,12 @@ function showRenameTagModal(oldName, params) {
     if (res.changed) {
       showToast(res.merged ? `Tag uniti in "${res.name}"` : `Tag rinominato in "${res.name}"`);
     }
-    renderBoard(params);
+    if (onDone) onDone(); else renderBoard(params);
   };
 
   const save = async () => {
     const newName = input.value.trim().substring(0, 30);
-    if (!newName || newName === oldName) { close(); return; }
+    if (!newName || newName === oldName) { cancel(); return; }
     const conflict = await findTagConflict(oldName, newName);
     if (!conflict) { await apply(newName); return; }
 
@@ -812,18 +870,18 @@ function showRenameTagModal(oldName, params) {
       <button class="btn btn-secondary" id="rename-tag-cancel">Annulla</button>
       <button class="btn btn-primary" id="rename-tag-merge">Unisci</button>
     `;
-    document.getElementById('rename-tag-cancel').addEventListener('click', close);
+    document.getElementById('rename-tag-cancel').addEventListener('click', cancel);
     document.getElementById('rename-tag-merge').addEventListener('click', () => apply(conflict));
   };
 
-  document.getElementById('rename-tag-cancel').addEventListener('click', close);
+  document.getElementById('rename-tag-cancel').addEventListener('click', cancel);
   document.getElementById('rename-tag-save').addEventListener('click', save);
   input.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') save();
-    if (e.key === 'Escape') close();
+    if (e.key === 'Escape') cancel();
   });
   overlay.addEventListener('click', (e) => {
-    if (e.target === overlay) close();
+    if (e.target === overlay) cancel();
   });
 }
 

@@ -36,10 +36,11 @@ newsletter-curator/
     views/
       home.js         Lista delle board
       board.js        Vista board: link, drag & drop, selezione, tag, pannello Sezioni,
-                      rinomina tag, note, mail
+                      rinomina tag, gestione tag, note, mail
       article.js      Dettaglio link (titolo modificabile, apertura dell'originale)
                       e funzioni WordPress: credenziali, pubblicazione note
-      settings.js     Impostazioni: credenziali WordPress, backup, ripristino, versioni
+      settings.js     Impostazioni: credenziali WordPress, backup, ripristino, versioni,
+                      pulsante Gestisci tag
       summaries.js    Residuo della funzione riassunti AI, rimossa: non è caricato
                       da index.html né dal service worker
   icons/
@@ -84,6 +85,8 @@ python serve.py
 - **Finestra dei tag:** la matita rinomina un tag su tutte le board (il colore resta); se il nome
   esiste già, dopo conferma i due tag si uniscono e resta il colore del tag esistente.
   La crocetta elimina il tag da tutti i link.
+- **Gestisci tag (Impostazioni):** apre la stessa finestra con tutti i tag di tutte le board,
+  con matita e crocetta, senza partire da un articolo. Serve per fare pulizia nell'elenco.
 - **Colori dei tag:** 8 colori ben distinti, assegnati all'indice libero più basso; dal nono tag
   vivo in poi si usano sfumature. Ogni tag tiene il suo colore in tutte le board. Un tag
   eliminato, o non più assegnato a nessun link, libera il suo colore.
@@ -190,6 +193,6 @@ ripulito durante le vacanze e l'unico backup esistente era quello manuale dell'1
 un finto WordPress (28 verifiche) su backup automatico, rotazione, protezione anti disastro
 dopo la pulizia dello storage, backup forzato, compatibilità con i backup vecchi e
 funzionamento senza credenziali. Per sezioni, colori e rinomina (7 novembre 2026) una suite
-analoga (32 verifiche, iPhone simulato) ha coperto anche l'aggiornamento dalla versione
+analoga (37 verifiche, iPhone simulato, compresa la gestione dei tag da Impostazioni) ha coperto anche l'aggiornamento dalla versione
 precedente, il backup dei tag e il ripristino di un backup vecchio. Le suite non sono salvate
 in questo repository.

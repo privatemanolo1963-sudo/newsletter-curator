@@ -37,6 +37,14 @@ function renderSettings() {
       </div>
 
       <div class="settings-section">
+        <div class="settings-label">Tag</div>
+        <div class="settings-description">Rinomina o elimina i tag di tutte le board.</div>
+        <div class="settings-key-actions">
+          <button class="btn btn-secondary" id="btn-manage-tags" style="flex:1">Gestisci tag</button>
+        </div>
+      </div>
+
+      <div class="settings-section">
         <div class="settings-label">Dati locali</div>
         <div class="settings-description">Esporta o importa un backup come file JSON.</div>
         <div class="settings-key-actions">
@@ -57,6 +65,9 @@ function renderSettings() {
   document.getElementById('btn-back').addEventListener('click', () => {
     Router.navigate('#/');
   });
+
+  // Gestione dei tag
+  document.getElementById('btn-manage-tags').addEventListener('click', showTagManager);
 
   // Save WP credentials
   document.getElementById('btn-save-wp').addEventListener('click', () => {
