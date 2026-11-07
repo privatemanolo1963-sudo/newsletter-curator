@@ -1,7 +1,7 @@
 # Newsletter Curator — PWA
 
 **Progetto:** app web (PWA) mobile-first per iPhone, primo anello della catena di produzione della newsletter [humans/AI].
-**Scopo:** raccogliere link durante la settimana, organizzarli in board tematiche, generare riassunti AI, riordinarli via drag & drop, ed esportarli via email a Cowork.
+**Scopo:** raccogliere link durante la settimana, organizzarli in board tematiche, generare riassunti AI, riordinarli via drag & drop, ed esportarli via email per avviare il lavoro sulla newsletter.
 
 ---
 
@@ -31,6 +31,7 @@ newsletter-curator/
     app.js            — Inizializzazione app e router
     db.js             — Schema IndexedDB (Dexie): Board, Link, Summary
     router.js         — Router SPA hash-based
+    backup.js         — Backup automatico su WordPress (vedi sezione dedicata)
     views/
       home.js         — Lista board
       board.js        — Vista board con link, drag & drop, selezione
@@ -38,8 +39,11 @@ newsletter-curator/
       settings.js     — Impostazioni (API key, backup/restore)
       summaries.js    — Vista riassunti per board
   icons/
-    icon-192.png      — Icona PWA 192x192
-    icon-512.png      — Icona PWA 512x512
+    icon-192.svg      — Icona PWA
+  docs/
+    newsletter-curator-v1-specs.md  — Specifiche funzionali e UX originali
+    prompt-claude-code.md           — Prompt a fasi usato per costruire l'app
+    versioni-precedenti/            — Copie di backup del CLAUDE.md
 ```
 
 ---
@@ -64,20 +68,23 @@ python serve.py
 
 ## Catena di produzione newsletter
 
-Questa app e' il primo passo:
-
-1. **Newsletter Curator** (questa app) — Matteo raccoglie e ordina i link su iPhone
-2. **Esportazione via mail** — L'app genera una mail con subject "CC" contenente i link ordinati
-3. **Cowork** (cartella `../NEWSLETTER/`) — Legge la mail, genera template, produce storyboard e bozza
-4. **Claude Code** — Scraping articoli con Playwright
+Questa app e' il primo passo: Matteo raccoglie e ordina i link su iPhone, poi li esporta
+con una mail (oggetto = nome della board) che si manda da solo. Da li' il lavoro sulla
+newsletter prosegue con Claude in linguaggio naturale, senza un formato vincolato della mail.
 
 ---
 
 ## Specifiche di design
 
-Le specifiche complete V1 sono nella cartella `../app curation/`:
-- `newsletter-curator-v1-specs.md` — Specifiche funzionali e UX
-- `prompt-claude-code.md` — Prompt originale usato per costruire l'app
+Le specifiche originali sono nella cartella `docs/` di questo repository:
+- `newsletter-curator-v1-specs.md` — Specifiche funzionali e UX della prima versione
+- `prompt-claude-code.md` — Prompt a fasi usato per costruire l'app
+
+L'app si e' evoluta dopo quelle specifiche: fanno fede il codice e questo file.
+Le specifiche di nuove funzioni vanno in `docs/` come file nuovi, senza sovrascrivere quelli esistenti.
+
+Questo CLAUDE.md e' il file unico di riferimento del progetto. Prima di ogni modifica
+strutturale salvarne una copia in `docs/versioni-precedenti/`.
 
 ---
 
