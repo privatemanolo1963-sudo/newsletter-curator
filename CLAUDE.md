@@ -29,12 +29,14 @@ newsletter-curator/
     style.css         Stili (tema scuro, mobile-first)
   js/
     app.js            Inizializzazione, rotte, avvio del backup automatico
-    db.js             Schema IndexedDB (Dexie): boards, links, summaries
+    db.js             Schema IndexedDB (Dexie): boards, links, summaries, tags
+    tags.js           Tag: colori fissi, ordine delle sezioni, rinomina ed eliminazione
     router.js         Router SPA basato sull'hash
     backup.js         Backup automatico su WordPress (vedi sezione dedicata)
     views/
       home.js         Lista delle board
-      board.js        Vista board: link, drag & drop, selezione, tag, note, mail
+      board.js        Vista board: link, drag & drop, selezione, tag, pannello Sezioni,
+                      rinomina tag, note, mail
       article.js      Dettaglio link (titolo modificabile, apertura dell'originale)
                       e funzioni WordPress: credenziali, pubblicazione note
       settings.js     Impostazioni: credenziali WordPress, backup, ripristino, versioni
@@ -44,6 +46,7 @@ newsletter-curator/
     icon-192.svg      Icona PWA
   docs/
     newsletter-curator-v1-specs.md  Specifiche funzionali e UX originali
+    specifiche-sezioni-colori-tag_2026-11-07.md  Pannello Sezioni, colori fissi, rinomina tag
     prompt-claude-code.md           Prompt a fasi usato per costruire l'app
     versioni-precedenti/            Copie di backup del CLAUDE.md
 ```
@@ -66,12 +69,24 @@ python serve.py
 - **Board, intestazione:** titolo modificabile e tre pulsanti.
   - **Note:** incolla un articolo (titolo e testo, con `contenteditable` per conservare i link),
     lo pubblica come post su humansai.it e aggiunge alla board un link che punta al post.
-  - **Tag:** ordina i link per tag, in ordine alfabetico, con i link senza tag in fondo.
+  - **Tag:** riordina la board per sezioni e apre il pannello **Sezioni** (una riga per tag
+    con il numero dei link). Le righe si trascinano e la board si riordina mentre si sposta;
+    si chiude con la X. I link senza tag stanno sempre in fondo.
   - **Mail:** esporta tutti i link nell'ordine visibile, raggruppati per tag.
 - **Board, inserimento:** si incolla un URL, l'app recupera il titolo e mette il link in testa.
+- **Ordine delle sezioni:** ogni board ricorda il suo (campo `tagOrder`). Un tag nuovo entra in
+  fondo, prima dei link senza tag. Dentro ogni sezione i link restano nel loro ordine, quindi un
+  link nuovo finisce in testa alla sua sezione. Copiando o spostando link in un'altra board,
+  l'ordine delle loro sezioni passa alla board di destinazione.
 - **Link:** drag & drop (anche di più link selezionati insieme); tocco sul tag per assegnarlo,
   scegliendo tra i tag già usati in tutte le board o scrivendone uno nuovo (massimo 30 caratteri);
-  un tag si può eliminare da tutti i link che lo usano; tocco sul titolo per aprire il dettaglio.
+  tocco sul titolo per aprire il dettaglio.
+- **Finestra dei tag:** la matita rinomina un tag su tutte le board (il colore resta); se il nome
+  esiste già, dopo conferma i due tag si uniscono e resta il colore del tag esistente.
+  La crocetta elimina il tag da tutti i link.
+- **Colori dei tag:** 8 colori ben distinti, assegnati all'indice libero più basso; dal nono tag
+  vivo in poi si usano sfumature. Ogni tag tiene il suo colore in tutte le board. Un tag
+  eliminato, o non più assegnato a nessun link, libera il suo colore.
 - **Action bar** (compare con la selezione): Tutti/Deseleziona, Sposta, Copia, Elimina.
   Sposta e Copia permettono anche di creare una board nuova.
 - **Mail di esportazione:** oggetto = nome della board; nel testo, per ogni sezione una riga
@@ -81,8 +96,10 @@ python serve.py
 
 ## Struttura dati (IndexedDB)
 
-- **Board**: id, name, createdAt, updatedAt
+- **Board**: id, name, tagOrder (ordine delle sezioni, facoltativo), createdAt, updatedAt
 - **Link**: id, boardId, url, title, domain, tag (facoltativo), thumbnailUrl, sortOrder, createdAt, updatedAt
+- **Tag** (schema versione 2): name (chiave), colorIndex, createdAt. Si allinea ai link con
+  `syncTagRecords()` all'avvio, dopo ogni modifica ai tag e dopo un ripristino.
 - **Summary**: id, linkId, boardId, content, generatedAt. Tabella rimasta dalla funzione riassunti:
   l'interfaccia non la usa più, ma resta nello schema ed è compresa nel backup.
 
@@ -150,7 +167,7 @@ ripulito durante le vacanze e l'unico backup esistente era quello manuale dell'1
 
 - **Quando parte:** all'avvio dell'app (dopo 3 secondi, con rotazione dello storico) e
   circa 10 secondi dopo ogni modifica ai dati. Le modifiche sono intercettate con gli hook
-  di Dexie su `boards`, `links`, `summaries`, quindi non serve chiamare nulla dalle viste.
+  di Dexie su `boards`, `links`, `summaries`, `tags`, quindi non serve chiamare nulla dalle viste.
   Un backup in sospeso viene forzato quando la pagina passa in background (`visibilitychange`,
   `pagehide`), perché iOS può chiudere l'app senza preavviso.
 - **Dove:** post privato WordPress con slug `curator-backup-data`, più 5 slot di storico
@@ -166,8 +183,13 @@ ripulito durante le vacanze e l'unico backup esistente era quello manuale dell'1
   nello storico. NON rimuovere questo controllo.
 - **Stato:** salvato in `localStorage` sotto `curator_backup_state`. Mostrato in Impostazioni
   e come banner in Home se il backup è bloccato, fallito, mai eseguito o più vecchio di 3 giorni.
+- **Tag nel backup:** la tabella `tags` entra in export, import e confronto dei dati. Un backup
+  senza tabella `tags` resta ripristinabile: i colori vengono ricostruiti dai link.
 
 **Test:** nella sessione che ha introdotto il backup è stata usata una suite Playwright con
 un finto WordPress (28 verifiche) su backup automatico, rotazione, protezione anti disastro
 dopo la pulizia dello storage, backup forzato, compatibilità con i backup vecchi e
-funzionamento senza credenziali. La suite non è salvata in questo repository.
+funzionamento senza credenziali. Per sezioni, colori e rinomina (7 novembre 2026) una suite
+analoga (32 verifiche, iPhone simulato) ha coperto anche l'aggiornamento dalla versione
+precedente, il backup dei tag e il ripristino di un backup vecchio. Le suite non sono salvate
+in questo repository.

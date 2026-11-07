@@ -103,7 +103,8 @@ function sameBackupData(a, b) {
   const norm = (d) => JSON.stringify({
     boards: d.boards || [],
     links: d.links || [],
-    summaries: d.summaries || []
+    summaries: d.summaries || [],
+    tags: d.tags || []
   });
   return norm(a) === norm(b);
 }
@@ -283,7 +284,7 @@ function flushAutoBackup() {
 }
 
 function attachBackupHooks() {
-  ['boards', 'links', 'summaries'].forEach((table) => {
+  ['boards', 'links', 'summaries', 'tags'].forEach((table) => {
     if (!db[table]) return;
     db[table].hook('creating', () => { scheduleAutoBackup(); });
     db[table].hook('updating', () => { scheduleAutoBackup(); });

@@ -22,8 +22,11 @@ Router.register('#/settings', renderSettings);
   localStorage.setItem(DONE_KEY, '1');
 })();
 
-// Start router
-Router.init();
+// Start router (dopo aver allineato i colori dei tag: alla prima esecuzione li assegna)
+(async function startApp() {
+  try { await syncTagRecords(); } catch (e) { /* i colori si ricaricano al rendering */ }
+  Router.init();
+})();
 
 // Avvia il backup automatico su WordPress
 initAutoBackup();

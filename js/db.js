@@ -8,6 +8,14 @@ db.version(1).stores({
   summaries: 'id, linkId, boardId, generatedAt'
 });
 
+// Versione 2: archivio dei tag con il colore fisso di ciascuno (vedi js/tags.js)
+db.version(2).stores({
+  boards: 'id, name, createdAt, updatedAt',
+  links: 'id, boardId, url, sortOrder, createdAt, updatedAt',
+  summaries: 'id, linkId, boardId, generatedAt',
+  tags: 'name'
+});
+
 // === Board Operations ===
 
 function generateId() {
@@ -102,6 +110,7 @@ async function deleteLinks(ids) {
 
 async function moveLinks(ids, targetBoardId) {
   const now = Date.now();
+  await carryTagOrder(ids, targetBoardId);
   // Get max sortOrder in target board
   const targetLinks = await db.links.where('boardId').equals(targetBoardId).toArray();
   let maxOrder = targetLinks.length > 0 ? Math.max(...targetLinks.map(l => l.sortOrder || 0)) : -1;
@@ -116,6 +125,7 @@ async function moveLinks(ids, targetBoardId) {
 
 async function copyLinks(ids, targetBoardId) {
   const now = Date.now();
+  await carryTagOrder(ids, targetBoardId);
   const targetLinks = await db.links.where('boardId').equals(targetBoardId).toArray();
   let maxOrder = targetLinks.length > 0 ? Math.max(...targetLinks.map(l => l.sortOrder || 0)) : -1;
 
@@ -172,16 +182,21 @@ async function exportAllData() {
   const boards = await db.boards.toArray();
   const links = await db.links.toArray();
   const summaries = await db.summaries.toArray();
-  return { boards, links, summaries, exportedAt: Date.now() };
+  const tags = await db.tags.toArray();
+  return { boards, links, summaries, tags, exportedAt: Date.now() };
 }
 
 async function importAllData(data) {
-  await db.transaction('rw', db.boards, db.links, db.summaries, async () => {
+  await db.transaction('rw', db.boards, db.links, db.summaries, db.tags, async () => {
     await db.boards.clear();
     await db.links.clear();
     await db.summaries.clear();
+    await db.tags.clear();
     if (data.boards) await db.boards.bulkAdd(data.boards);
     if (data.links) await db.links.bulkAdd(data.links);
     if (data.summaries) await db.summaries.bulkAdd(data.summaries);
+    if (data.tags) await db.tags.bulkAdd(data.tags);
   });
+  // I backup precedenti non hanno la tabella dei tag: i colori si ricostruiscono dai link
+  await syncTagRecords();
 }

@@ -1,8 +1,9 @@
-const CACHE_NAME = 'curator-v26';
+const CACHE_NAME = 'curator-v27';
 const ASSETS = [
   './index.html',
   './css/style.css',
   './js/db.js',
+  './js/tags.js',
   './js/backup.js',
   './js/router.js',
   './js/views/home.js',

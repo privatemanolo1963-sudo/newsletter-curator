@@ -13,6 +13,7 @@ async function renderBoard(params) {
   }
 
   const links = await getBoardLinks(boardId);
+  await loadTagColors();
 
   const app = document.getElementById('app');
   window.scrollTo(0, 0);
@@ -166,24 +167,17 @@ async function renderBoard(params) {
     });
   });
 
-  // Sort by tag button
+  // Tag: riordina la board per sezioni e apre il pannello Sezioni
   const sortTagBtn = document.getElementById('btn-sort-tag');
   if (sortTagBtn) {
     sortTagBtn.addEventListener('click', async () => {
-      // Sort: tagged links grouped alphabetically by tag, untagged at bottom
-      const sorted = [...links].sort((a, b) => {
-        const tagA = (a.tag || '').toLowerCase();
-        const tagB = (b.tag || '').toLowerCase();
-        if (!tagA && !tagB) return 0;
-        if (!tagA) return 1;
-        if (!tagB) return -1;
-        if (tagA !== tagB) return tagA.localeCompare(tagB);
-        return 0; // keep relative order within same tag
-      });
-      const orderedIds = sorted.map(l => l.id);
-      await updateLinkSortOrders(orderedIds);
-      renderBoard(params);
-      showToast('Ordinato per tag');
+      const result = await sortBoardBySections(boardId);
+      if (result.order.length === 0) {
+        showToast('Nessun tag in questa board');
+        return;
+      }
+      await renderBoard(params);
+      showSectionsPanel(boardId, params, result);
     });
   }
 
@@ -302,15 +296,65 @@ function renderLinkCard(link, isSelected) {
   `;
 }
 
-// Tag color — HSL-based, always unique per tag string
-function tagColor(tag) {
-  let hash = 0;
-  for (let i = 0; i < tag.length; i++) hash = ((hash << 5) - hash) + tag.charCodeAt(i);
-  hash = Math.abs(hash);
-  const hue = hash % 360;
-  const sat = 55 + (hash >> 8) % 25;   // 55–80%
-  const lit = 45 + (hash >> 16) % 15;   // 45–60%
-  return `hsl(${hue}, ${sat}%, ${lit}%)`;
+// I colori dei tag sono gestiti in js/tags.js (tagColor)
+
+// === Pannello Sezioni ===
+
+function showSectionsPanel(boardId, params, result) {
+  document.getElementById('sections-overlay')?.remove();
+
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay sections-overlay';
+  overlay.id = 'sections-overlay';
+
+  const rows = result.order.map(t => `
+    <div class="section-row" data-tag="${escapeHtml(t)}">
+      <span class="section-row-drag">&#9776;</span>
+      <span class="section-row-chip" style="background:${tagColor(t)}">${escapeHtml(t)}</span>
+      <span class="section-row-count">${result.counts[t] || 0}</span>
+    </div>`).join('');
+
+  const untaggedRow = result.untagged > 0 ? `
+    <div class="section-row section-row-fixed">
+      <span class="section-row-drag"></span>
+      <span class="section-row-label">Senza tag</span>
+      <span class="section-row-count">${result.untagged}</span>
+    </div>` : '';
+
+  overlay.innerHTML = `
+    <div class="modal sections-modal">
+      <div class="sections-header">
+        <h2>Sezioni</h2>
+        <button class="sections-close" id="sections-close" title="Chiudi">&times;</button>
+      </div>
+      <div class="sections-list" id="sections-list">${rows}</div>
+      ${untaggedRow}
+    </div>
+  `;
+  document.body.appendChild(overlay);
+
+  const close = () => overlay.remove();
+  document.getElementById('sections-close').addEventListener('click', close);
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) close();
+  });
+
+  const listEl = document.getElementById('sections-list');
+  Sortable.create(listEl, {
+    animation: 180,
+    ghostClass: 'section-row-ghost',
+    chosenClass: 'section-row-chosen',
+    delay: 80,
+    delayOnTouchOnly: true,
+    touchStartThreshold: 3,
+    fallbackTolerance: 3,
+    onEnd: async (evt) => {
+      if (evt.oldIndex === evt.newIndex) return;
+      const order = Array.from(listEl.querySelectorAll('.section-row')).map(r => r.dataset.tag);
+      await setBoardSectionOrder(boardId, order);
+      await renderBoard(params);
+    }
+  });
 }
 
 // === Action Bar ===
@@ -647,6 +691,7 @@ async function showTagModal(linkId, boardId, params) {
     ? `<div class="tag-presets">${existingTags.map(t =>
         `<span class="tag-preset-wrap">` +
         `<button class="tag-preset ${link.tag === t ? 'tag-preset-active' : ''}" data-tag="${escapeHtml(t)}" style="background:${tagColor(t)}">${escapeHtml(t)}</button>` +
+        `<button class="tag-preset-edit" data-tag="${escapeHtml(t)}" title="Rinomina tag">&#9998;</button>` +
         `<button class="tag-preset-delete" data-tag="${escapeHtml(t)}" title="Elimina tag">&times;</button>` +
         `</span>`
       ).join('')}</div>`
@@ -672,6 +717,7 @@ async function showTagModal(linkId, boardId, params) {
   const save = async (tagValue) => {
     const tag = (tagValue || '').trim().substring(0, 30);
     await db.links.update(linkId, { tag: tag || undefined, updatedAt: Date.now() });
+    await syncTagRecords();
     close();
     renderBoard(params);
   };
@@ -692,13 +738,19 @@ async function showTagModal(linkId, boardId, params) {
     btn.addEventListener('click', async (e) => {
       e.stopPropagation();
       const tagToDelete = btn.dataset.tag;
-      const linksWithTag = allLinks.filter(l => l.tag === tagToDelete);
-      for (const l of linksWithTag) {
-        await db.links.update(l.id, { tag: undefined, updatedAt: Date.now() });
-      }
-      showToast(`Tag "${tagToDelete}" eliminato da ${linksWithTag.length} link`);
+      const count = await deleteTag(tagToDelete);
+      showToast(`Tag "${tagToDelete}" eliminato da ${count} link`);
       close();
       renderBoard(params);
+    });
+  });
+
+  // Edit buttons — rename tag on ALL boards
+  overlay.querySelectorAll('.tag-preset-edit').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      close();
+      showRenameTagModal(btn.dataset.tag, params);
     });
   });
 
@@ -707,6 +759,67 @@ async function showTagModal(linkId, boardId, params) {
   document.getElementById('tag-remove')?.addEventListener('click', () => save(''));
   input.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') save(input.value);
+    if (e.key === 'Escape') close();
+  });
+  overlay.addEventListener('click', (e) => {
+    if (e.target === overlay) close();
+  });
+}
+
+// === Rename Tag Modal ===
+
+function showRenameTagModal(oldName, params) {
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.innerHTML = `
+    <div class="modal">
+      <h2>Rinomina tag</h2>
+      <input class="modal-input" id="rename-tag-input" type="text" value="${escapeHtml(oldName)}" maxlength="30" autocomplete="off">
+      <p class="confirm-text rename-tag-note" id="rename-tag-note">Il nuovo nome vale su tutte le board e il colore resta lo stesso.</p>
+      <div class="modal-actions" id="rename-tag-actions">
+        <button class="btn btn-secondary" id="rename-tag-cancel">Annulla</button>
+        <button class="btn btn-primary" id="rename-tag-save">Salva</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+
+  const input = document.getElementById('rename-tag-input');
+  input.focus();
+  input.select();
+  const close = () => overlay.remove();
+
+  const apply = async (newName) => {
+    const res = await renameTag(oldName, newName);
+    close();
+    if (res.changed) {
+      showToast(res.merged ? `Tag uniti in "${res.name}"` : `Tag rinominato in "${res.name}"`);
+    }
+    renderBoard(params);
+  };
+
+  const save = async () => {
+    const newName = input.value.trim().substring(0, 30);
+    if (!newName || newName === oldName) { close(); return; }
+    const conflict = await findTagConflict(oldName, newName);
+    if (!conflict) { await apply(newName); return; }
+
+    // Il nome esiste già: conferma prima di unire i due tag
+    input.disabled = true;
+    document.getElementById('rename-tag-note').textContent =
+      `"${conflict}" esiste già: unisco i due tag? Tutti i link di "${oldName}" passano a "${conflict}", che tiene il suo colore.`;
+    document.getElementById('rename-tag-actions').innerHTML = `
+      <button class="btn btn-secondary" id="rename-tag-cancel">Annulla</button>
+      <button class="btn btn-primary" id="rename-tag-merge">Unisci</button>
+    `;
+    document.getElementById('rename-tag-cancel').addEventListener('click', close);
+    document.getElementById('rename-tag-merge').addEventListener('click', () => apply(conflict));
+  };
+
+  document.getElementById('rename-tag-cancel').addEventListener('click', close);
+  document.getElementById('rename-tag-save').addEventListener('click', save);
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') save();
     if (e.key === 'Escape') close();
   });
   overlay.addEventListener('click', (e) => {
