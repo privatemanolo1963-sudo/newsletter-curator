@@ -48,6 +48,7 @@ newsletter-curator/
   docs/
     newsletter-curator-v1-specs.md  Specifiche funzionali e UX originali
     specifiche-sezioni-colori-tag_2026-11-07.md  Pannello Sezioni, colori fissi, rinomina tag
+    specifiche-pubblicazione-note_2026-11-08.md  Pubblicazione delle note: bozza, controllo sul sito
     prompt-claude-code.md           Prompt a fasi usato per costruire l'app
     versioni-precedenti/            Copie di backup del CLAUDE.md
 ```
@@ -69,7 +70,8 @@ python serve.py
 - **Home:** elenco delle board, dalla più recente; creazione ed eliminazione (il nome si cambia dentro la board).
 - **Board, intestazione:** titolo modificabile e tre pulsanti.
   - **Note:** incolla un articolo (titolo e testo, con `contenteditable` per conservare i link),
-    lo pubblica come post su humansai.it e aggiunge alla board un link che punta al post.
+    lo pubblica come post su humansai.it e aggiunge alla board un link che punta al post
+    (vedi la sezione "Pubblicazione delle note").
   - **Tag:** riordina la board per sezioni e apre il pannello **Sezioni** (una riga per tag
     con il numero dei link). Le righe si trascinano e la board si riordina mentre si sposta;
     si chiude con la X. I link senza tag stanno sempre in fondo.
@@ -161,6 +163,25 @@ strutturale salvarne una copia in `docs/versioni-precedenti/`.
 
 ---
 
+## Pubblicazione delle note (novembre 2026)
+
+Introdotta dopo errori ricorrenti sulle note lunghe, con post doppi su humansai.it: WordPress
+pubblicava, ma la conferma non arrivava all'iPhone. Dettagli in
+`docs/specifiche-pubblicazione-note_2026-11-08.md`.
+
+**File:** `js/views/article.js` (`createWpDraft`, `publishWpDraft`, `confirmWpPublished`) e
+`showNoteModal` in `js/views/board.js`.
+
+- La nota entra su WordPress come bozza, poi diventa pubblica. L'id della bozza resta nella
+  finestra, quindi premendo di nuovo Pubblica si lavora sempre sullo stesso post.
+- Se la connessione cade o il server dà errore durante la pubblicazione, l'app controlla lo stato
+  del post per circa 35 secondi. Se è pubblicato, la nota è riuscita e il link giusto va in board.
+- I rifiuti espliciti di WordPress (errori 4xx) vengono mostrati subito.
+- Durante la pubblicazione il backup automatico aspetta (`holdAutoBackup`, `releaseAutoBackup`
+  in `js/backup.js`).
+
+---
+
 ## Backup automatico su WordPress (agosto 2026)
 
 Introdotto dopo la perdita di tutte le board: lo storage di Chrome su iPhone è stato
@@ -172,7 +193,8 @@ ripulito durante le vacanze e l'unico backup esistente era quello manuale dell'1
   circa 10 secondi dopo ogni modifica ai dati. Le modifiche sono intercettate con gli hook
   di Dexie su `boards`, `links`, `summaries`, `tags`, quindi non serve chiamare nulla dalle viste.
   Un backup in sospeso viene forzato quando la pagina passa in background (`visibilitychange`,
-  `pagehide`), perché iOS può chiudere l'app senza preavviso.
+  `pagehide`), perché iOS può chiudere l'app senza preavviso. Mentre una nota è in pubblicazione
+  il backup aspetta e riparte subito dopo.
 - **Dove:** post privato WordPress con slug `curator-backup-data`, più 5 slot di storico
   `curator-backup-hist-1..5` a rotazione. Lo storico viene aggiornato solo all'avvio e solo
   se i dati sono davvero cambiati.

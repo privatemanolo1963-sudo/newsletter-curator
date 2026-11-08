@@ -248,9 +248,30 @@ function describeVersion(post, slug, label) {
 let backupTimer = null;
 let backupRunning = false;
 let backupPending = false;
+let backupHeld = false;
+
+// Mentre una nota è in pubblicazione il backup aspetta, per non caricare il sito
+// con due richieste insieme. Le modifiche arrivate nel frattempo restano in sospeso.
+function holdAutoBackup() {
+  backupHeld = true;
+  if (backupTimer) {
+    clearTimeout(backupTimer);
+    backupTimer = null;
+    backupPending = true;
+  }
+}
+
+function releaseAutoBackup() {
+  backupHeld = false;
+  if (backupPending && !backupRunning) {
+    backupPending = false;
+    scheduleAutoBackup();
+  }
+}
 
 function scheduleAutoBackup() {
   if (!getWpCredentials()) return;
+  if (backupHeld) { backupPending = true; return; }
   clearTimeout(backupTimer);
   backupTimer = setTimeout(() => runAutoBackup(), AUTO_BACKUP_DELAY_MS);
 }
@@ -258,7 +279,7 @@ function scheduleAutoBackup() {
 async function runAutoBackup(options) {
   const opts = options || {};
   if (!getWpCredentials()) return;
-  if (backupRunning) { backupPending = true; return; }
+  if (backupRunning || backupHeld) { backupPending = true; return; }
   backupRunning = true;
   clearTimeout(backupTimer);
   try {

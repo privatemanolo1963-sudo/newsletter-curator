@@ -149,31 +149,73 @@ async function restoreFromWordPress() {
   }
 }
 
-async function publishToWordPress(title, content) {
-  const creds = getWpCredentials();
-  if (!creds) throw new Error('Credenziali WordPress non configurate. Vai in Impostazioni.');
+// === Pubblicazione delle note ===
+//
+// La nota entra su WordPress come bozza e solo dopo diventa pubblica. Avendo l'id
+// della bozza, se la connessione cade durante la pubblicazione l'app chiede al sito
+// come è finita, e premendo di nuovo Pubblica lavora sullo stesso post.
 
-  const endpoint = creds.siteUrl + '/wp-json/wp/v2/posts';
-  const auth = btoa(creds.user + ':' + creds.appPassword);
+const NOTE_CHECK_ATTEMPTS = 8;
+const NOTE_CHECK_INTERVAL_MS = 5000;
 
+async function wpResponseError(res) {
+  const body = await res.json().catch(() => ({}));
+  const error = new Error(body.message || 'Errore WordPress (' + res.status + ')');
+  error.status = res.status;
+  return error;
+}
+
+async function createWpDraft(title, content) {
+  const { auth, endpoint } = await wpAuthHeaders();
   const res = await fetch(endpoint, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': 'Basic ' + auth
-    },
-    body: JSON.stringify({
-      title: title,
-      content: content,
-      status: 'publish'
-    })
+    headers: { 'Content-Type': 'application/json', 'Authorization': auth },
+    body: JSON.stringify({ title: title, content: content, status: 'draft' })
   });
-
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err.message || 'Errore WordPress (' + res.status + ')');
-  }
-
+  if (!res.ok) throw await wpResponseError(res);
   const post = await res.json();
-  return post.link;
+  return { id: post.id, title: title, content: content };
+}
+
+async function confirmWpPublished(postId) {
+  const { auth, endpoint } = await wpAuthHeaders();
+  const url = endpoint + '/' + postId + '?context=edit&_fields=id,status,link';
+  for (let attempt = 0; attempt < NOTE_CHECK_ATTEMPTS; attempt++) {
+    if (attempt > 0) await new Promise((resolve) => setTimeout(resolve, NOTE_CHECK_INTERVAL_MS));
+    try {
+      const res = await fetch(url, { headers: { 'Authorization': auth }, cache: 'no-store' });
+      if (res.ok) {
+        const post = await res.json();
+        if (post.status === 'publish') return post.link;
+      }
+    } catch {
+      // connessione ancora assente: si riprova al giro successivo
+    }
+  }
+  return null;
+}
+
+async function publishWpDraft(draft, title, content) {
+  const { auth, endpoint } = await wpAuthHeaders();
+  const changes = { status: 'publish' };
+  if (title !== draft.title || content !== draft.content) {
+    changes.title = title;
+    changes.content = content;
+  }
+  try {
+    const res = await fetch(endpoint + '/' + draft.id, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': auth },
+      body: JSON.stringify(changes)
+    });
+    if (!res.ok) throw await wpResponseError(res);
+    const post = await res.json();
+    return post.link;
+  } catch (err) {
+    // Un rifiuto esplicito di WordPress (credenziali, permessi) è definitivo.
+    if (err.status >= 400 && err.status < 500) throw err;
+    const link = await confirmWpPublished(draft.id);
+    if (link) return link;
+    throw new Error('Nota non ancora pubblicata: premi di nuovo Pubblica');
+  }
 }

@@ -888,6 +888,9 @@ function showRenameTagModal(oldName, params, onDone) {
 // === Note Modal (Paste Article → WordPress) ===
 
 function showNoteModal(boardId, params) {
+  // Bozza già creata su WordPress: premendo di nuovo Pubblica si riusa la stessa.
+  let wpDraft = null;
+
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay';
   overlay.innerHTML = `
@@ -923,6 +926,7 @@ function showNoteModal(boardId, params) {
     saveBtn.textContent = '...';
     saveBtn.disabled = true;
 
+    holdAutoBackup();
     try {
       // Save placeholder link in DB FIRST (before WP call that can break IndexedDB)
       const tempUrl = 'https://humansai.it/pending-' + Date.now();
@@ -973,11 +977,13 @@ function showNoteModal(boardId, params) {
       const htmlContent = sanitizeNoteHtml(rawHtml);
 
       try {
-        const wpUrl = await publishToWordPress(title, htmlContent);
+        if (!wpDraft) wpDraft = await createWpDraft(title, htmlContent);
+        const wpUrl = await publishWpDraft(wpDraft, title, htmlContent);
         // Update the placeholder with real WP URL
         await db.links.update(newLink.id, { url: wpUrl, domain: extractDomain(wpUrl), updatedAt: Date.now() });
       } catch (wpErr) {
         // WP failed — remove placeholder
+        if (wpErr.status === 404) wpDraft = null; // bozza eliminata dal sito: se ne crea una nuova
         await db.links.delete(newLink.id).catch(() => {});
         throw wpErr;
       }
@@ -989,6 +995,8 @@ function showNoteModal(boardId, params) {
       saveBtn.textContent = 'Pubblica';
       saveBtn.disabled = false;
       showToast('Errore: ' + err.message);
+    } finally {
+      releaseAutoBackup();
     }
   });
 }
